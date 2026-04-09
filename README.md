@@ -28,6 +28,31 @@ The easiest way to run the project is using **Docker Compose**. This handles all
     - **Frontend**: `http://localhost:5000`
     - **Backend (API)**: `http://localhost:5025`
 
+## 🚀 Server Deployment
+
+If you are deploying to a remote server, follow these steps:
+
+1.  **Pull Changes**:
+    ```bash
+    git pull
+    ```
+
+2.  **Clean & Restart**:
+    Ensure you remove the old Caddy gateway container:
+    ```bash
+    docker compose down --remove-orphans
+    docker compose up -d --build --remove-orphans
+    ```
+
+3.  **Firewall Configuration**:
+    Open ports **5000** and **5025** on your server's firewall (e.g., `ufw allow 5000` and `ufw allow 5025`).
+
+4.  **⚠️ HTTPS Requirement**:
+    Webcam access requires **HTTPS**! Without Caddy/Ngrok, the camera will **only** work on `localhost`. 
+    To use it on a public server, you must:
+    - Use another reverse proxy (like Nginx) on the server to provide SSL.
+    - Or run an `ngrok` tunnel on the server: `ngrok http 5000`.
+
 ---
 
 ## 🏗️ Architecture
