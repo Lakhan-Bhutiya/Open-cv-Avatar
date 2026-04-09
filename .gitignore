@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+.env
+
+# Node / JS
+node_modules/
+web-app/node_modules/
+web-app/dist/
+*.log
+
+# Docker / Deployment
+.DS_Store
+.cdata/
+.gemini/
+
+# MediaPipe Models (Optional: ignore if you want to download during runtime/build)
+# face_landmarker.task

@@ -1,0 +1,17 @@
+# Use Node 18 from official images
+FROM node:18-slim
+
+WORKDIR /app
+
+# Copy package.json and install dependencies
+# Note: we are in /app, so we need to copy from web-app/
+COPY web-app/package*.json ./
+RUN npm install
+
+
+COPY web-app/ .
+
+# Expose the Vite port
+EXPOSE 3000
+
+CMD ["npm", "run", "dev"]

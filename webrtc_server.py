@@ -1,0 +1,227 @@
+import argparse
+import asyncio
+import json
+import logging
+import os
+import cv2
+import numpy as np
+
+from aiohttp import web
+from aiortc import RTCPeerConnection, RTCSessionDescription, VideoStreamTrack, RTCIceServer, RTCConfiguration
+from aiortc.contrib.media import MediaRelay
+from av import VideoFrame
+
+# Import your existing Python logic!
+from face_detector import FaceDetector
+from cap_overlay import CapOverlay
+from warning_system import check_placement, CapStatus
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("pc")
+
+relay = MediaRelay()
+
+# Initialize our AI models globally so we don't reload them
+face_detector = FaceDetector(static_image_mode=False)
+
+# Get all cap images in the assets folder
+CAPS_DIR = os.path.join("web-app", "public", "assets", "caps")
+cap_paths = [os.path.join(CAPS_DIR, f) for f in os.listdir(CAPS_DIR) if f.endswith(".png")]
+cap_paths.sort() # Ensure consistent ordering
+if not cap_paths:
+    # fallback
+    cap_paths = ["assets/caps/image.png"] # Example path, ideally it exists
+cap_overlay = CapOverlay(cap_paths)
+
+class CapVideoTrack(VideoStreamTrack):
+    """
+    A video stream track that transforms frames from an another track.
+    It takes the raw browser webcam feed, applies the cap, and sends it back.
+    """
+
+    def __init__(self, track):
+        super().__init__()  # don't forget this!
+        self.track = track
+        self.cap_index = 0
+
+    async def recv(self):
+        # Get a frame from the browser webcam stream
+        frame = await self.track.recv()
+
+        # Convert to numpy array (BGR from OpenCV)
+        img = frame.to_ndarray(format="bgr24")
+        
+        # Mirror the video for the classic "selfie" view immediately.
+        # This means face landmarks and printed text will all happen on the mirrored image.
+        img = cv2.flip(img, 1)
+
+    def transform(self, img, cap_index):
+        h, w = img.shape[:2]
+        # 1. Detect faces
+        faces = face_detector.detect(img)
+        
+        # 2. Process faces and apply caps
+        main_suggestion = "No face detected"
+        main_cap_status = CapStatus.ERROR
+        
+        if faces:
+            # We determine the status banner based on the "main" face (the first one)
+            first_face = faces[0]
+            cap_w, cap_h = cap_overlay.get_scaled_size(first_face, cap_index=cap_index)
+            check = check_placement(first_face, cap_w, cap_h)
+            main_cap_status = check.status
+            
+            if first_face.get("is_profile", False):
+                main_suggestion = "Look straight at the camera!"
+            elif first_face.get("is_forehead_covered", False):
+                main_suggestion = "Remove your hat / Clear your forehead!"
+            elif main_cap_status == CapStatus.ERROR:
+                main_suggestion = "Move your head DOWN! Not enough space above you."
+            elif main_cap_status == CapStatus.WARNING:
+                main_suggestion = f"Move your head slightly lower. ({check.coverage_pct}% visible)"
+            else:
+                main_suggestion = "Perfect! Keep it there."
+
+            # Loop through ALL faces and apply the cap to each
+            for face in faces:
+                # Re-calculate size and placement check for THIS individual face
+                this_cap_w, this_cap_h = cap_overlay.get_scaled_size(face, cap_index=cap_index)
+                this_check = check_placement(face, this_cap_w, this_cap_h)
+                
+                # Only apply if it doesn't cause a fatal error (e.g. off screen top)
+                if this_check.status != CapStatus.ERROR:
+                    img, _, _ = cap_overlay.apply(img, face, cap_index=cap_index)
+
+        # 3. Draw the Status Banner
+        colors = {
+            CapStatus.OK: (94, 197, 34),
+            CapStatus.WARNING: (60, 146, 251),
+            CapStatus.ERROR: (68, 68, 239)
+        }
+        color = colors.get(main_cap_status, colors[CapStatus.ERROR])
+
+        bar_h = 48
+        overlay = img.copy()
+        cv2.rectangle(overlay, (0, h - bar_h), (w, h), (0, 0, 0), -1)
+        img = cv2.addWeighted(overlay, 0.55, img, 0.45, 0)
+        cv2.line(img, (0, h - bar_h), (w, h - bar_h), color, 2)
+        icon = "[OK]" if main_cap_status == CapStatus.OK else "[WARN]" if main_cap_status == CapStatus.WARNING else "[ERR]"
+        msg = f"{icon} {main_suggestion}"
+        cv2.putText(img, msg, (15, h - 16), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+        return img
+
+    async def recv(self):
+        # Get a frame from the browser webcam stream
+        frame = await self.track.recv()
+
+        # Convert to numpy array (BGR from OpenCV)
+        img = frame.to_ndarray(format="bgr24")
+        
+        # Mirror the video for the classic "selfie" view immediately.
+        img = cv2.flip(img, 1)
+
+        # Offload CPU intensive work to a thread so we don't block the event loop
+        loop = asyncio.get_event_loop()
+        img = await loop.run_in_executor(None, self.transform, img, self.cap_index)
+
+        # 4. Re-pack frame to send back to browser
+        new_frame = VideoFrame.from_ndarray(img, format="bgr24")
+        new_frame.pts = frame.pts
+        new_frame.time_base = frame.time_base
+        return new_frame
+
+async def offer(request):
+    params = await request.json()
+    offer = RTCSessionDescription(sdp=params["sdp"], type=params["type"])
+
+    # Configure STUN for NAT traversal
+    ice_servers = [RTCIceServer(urls="stun:stun.l.google.com:19302")]
+    config = RTCConfiguration(iceServers=ice_servers)
+    pc = RTCPeerConnection(configuration=config)
+    pc_id = "PeerConnection(%s)" % id(pc)
+    logger.info("Created for %s", request.remote)
+
+    # Optional: support changing caps via datachannel? For now we can just hardcode or implement later
+
+    @pc.on("datachannel")
+    def on_datachannel(channel):
+        @channel.on("message")
+        def on_message(message):
+            # We can use this message to change the cap_index
+            if isinstance(message, str):
+                try:
+                    data = json.loads(message)
+                    if data.get("type") == "change_cap":
+                        # We'll need a way to pass this cap_index to the video track... 
+                        # We'll handle this purely in python memory by finding the track instance
+                        for sender in pc.getSenders():
+                            if isinstance(sender.track, CapVideoTrack):
+                                sender.track.cap_index = data.get("cap_index", 0)
+                except Exception as e:
+                    logger.error(f"Error parsing datachannel message: {e}")
+
+    @pc.on("connectionstatechange")
+    async def on_connectionstatechange():
+        logger.info("Connection state is %s", pc.connectionState)
+        if pc.connectionState == "failed":
+            await pc.close()
+
+    @pc.on("track")
+    def on_track(track):
+        logger.info("Track %s received", track.kind)
+
+        if track.kind == "video":
+            # Add our processing track
+            local_video = CapVideoTrack(relay.subscribe(track))
+            pc.addTrack(local_video)
+
+        @track.on("ended")
+        async def on_ended():
+            logger.info("Track %s ended", track.kind)
+
+    # Handle offer
+    await pc.setRemoteDescription(offer)
+    
+    # Send answer
+    answer = await pc.createAnswer()
+    await pc.setLocalDescription(answer)
+
+    return web.Response(
+        content_type="application/json",
+        text=json.dumps(
+            {"sdp": pc.localDescription.sdp, "type": pc.localDescription.type}
+        ),
+    )
+
+
+async def on_shutdown(app):
+    # Close all peer connections
+    coros = [pc.close() for pc in set()]
+    await asyncio.gather(*coros)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="WebRTC Cap Try-On Server")
+    parser.add_argument("--host", default="0.0.0.0", help="Host for HTTP server (default: 0.0.0.0)")
+    parser.add_argument("--port", type=int, default=8080, help="Port for HTTP server (default: 8080)")
+    args = parser.parse_args()
+
+    # CORS configuration so the Vite app (port 3000) can hit this server
+    app = web.Application()
+    app.on_shutdown.append(on_shutdown)
+    
+    import aiohttp_cors
+    cors = aiohttp_cors.setup(app, defaults={
+        "*": aiohttp_cors.ResourceOptions(
+                allow_credentials=True,
+                expose_headers="*",
+                allow_headers="*",
+            )
+    })
+
+    # Add routes
+    resource = cors.add(app.router.add_resource("/offer"))
+    cors.add(resource.add_route("POST", offer))
+
+
+    web.run_app(app, host=args.host, port=args.port)
