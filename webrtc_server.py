@@ -203,7 +203,7 @@ async def on_shutdown(app):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="WebRTC Cap Try-On Server")
     parser.add_argument("--host", default="0.0.0.0", help="Host for HTTP server (default: 0.0.0.0)")
-    parser.add_argument("--port", type=int, default=8080, help="Port for HTTP server (default: 8080)")
+    parser.add_argument("--port", type=int, default=5025, help="Port for HTTP server (default: 5025)")
     args = parser.parse_args()
 
     # CORS configuration so the Vite app (port 3000) can hit this server

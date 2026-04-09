@@ -30,7 +30,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Expose WebRTC signaling port
-EXPOSE 8080
+EXPOSE 5025
 
 # Run the server
-CMD ["python", "webrtc_server.py", "--port", "8080"]
+CMD ["python", "webrtc_server.py", "--port", "5025"]

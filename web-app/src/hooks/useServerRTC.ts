@@ -10,7 +10,7 @@ interface UseServerRTCProps {
 export function useServerRTC({
   localVideoRef,
   remoteVideoRef,
-  serverUrl = '/offer',
+  serverUrl = 'http://localhost:5025/offer',
   capIndex = 0
 }: UseServerRTCProps) {
   const [isConnected, setIsConnected] = useState(false);
