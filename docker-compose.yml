@@ -3,8 +3,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    ports:
-      - "5025:5025"
+    # ports:
+    #   - "5025:5025"
+    network_mode: host
+    env_file: .env
     volumes:
       - .:/app
       - /app/.venv # Don't sync internal venv
@@ -16,6 +18,7 @@ services:
       dockerfile: Dockerfile.frontend
     ports:
       - "5000:5000"
+    env_file: .env
     volumes:
       - ./web-app:/app
       - /app/node_modules
