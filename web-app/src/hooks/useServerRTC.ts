@@ -104,6 +104,10 @@ export function useServerRTC({
           }
         });
 
+        if (!serverUrl) {
+          throw new Error('Server URL is not defined. Please set VITE_SERVERURL in your .env file.');
+        }
+
         const response = await fetch(serverUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
