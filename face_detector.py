@@ -13,6 +13,8 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import os
+import math
+import time
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
@@ -48,15 +50,28 @@ class FaceDetector:
         """
         Detect faces and return list of face_data dicts.
         Returns [] if no face found.
+
+        For performance, detection is done on a downscaled copy of the frame
+        (max 480px tall). All returned coordinates are scaled back to the
+        original resolution, so callers don't need to change.
         """
         h, w = image_bgr.shape[:2]
-        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB))
+
+        # --- Downscale for faster detection ---
+        MAX_DETECT_H = 480
+        if h > MAX_DETECT_H:
+            scale = MAX_DETECT_H / h
+            detect_w = int(w * scale)
+            detect_img = cv2.resize(image_bgr, (detect_w, MAX_DETECT_H), interpolation=cv2.INTER_LINEAR)
+        else:
+            detect_img = image_bgr
+
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=cv2.cvtColor(detect_img, cv2.COLOR_BGR2RGB))
         
         if self.static_image_mode:
             results = self.detector.detect(mp_image)
         else:
             # For video mode, we need a timestamp in milliseconds
-            import time
             timestamp_ms = int(time.time() * 1000)
             results = self.detector.detect_for_video(mp_image, timestamp_ms)
 
@@ -88,7 +103,6 @@ class FaceDetector:
             # angle calculation for rotation
             dx = pt2[0] - pt1[0]
             dy = pt2[1] - pt1[1]
-            import math
             angle_deg = math.degrees(math.atan2(dy, dx))
 
             face_width      = int(right_x - left_x)

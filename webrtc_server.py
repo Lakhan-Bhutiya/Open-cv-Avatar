@@ -3,6 +3,7 @@ import asyncio
 import json
 import logging
 import os
+import time
 import cv2
 import numpy as np
 
@@ -36,24 +37,38 @@ cap_overlay = CapOverlay(cap_paths)
 class CapVideoTrack(VideoStreamTrack):
     """
     A video stream track that transforms frames from an another track.
-    It takes the raw browser webcam feed, applies the cap, and sends it back.
+    Uses a single-slot queue (maxsize=1) so the server always processes the
+    LATEST frame, dropping stale ones. This eliminates queue-buildup lag.
     """
 
     def __init__(self, track):
         super().__init__()  # don't forget this!
         self.track = track
         self.cap_index = 0
+        # Single-slot queue: putting a new frame when full drops the old one
+        self._queue: asyncio.Queue = asyncio.Queue(maxsize=1)
+        self._frames_dropped = 0
+        # Start background task that drains incoming frames into the queue
+        asyncio.ensure_future(self._drain_track())
 
-    async def recv(self):
-        # Get a frame from the browser webcam stream
-        frame = await self.track.recv()
-
-        # Convert to numpy array (BGR from OpenCV)
-        img = frame.to_ndarray(format="bgr24")
-        
-        # Mirror the video for the classic "selfie" view immediately.
-        # This means face landmarks and printed text will all happen on the mirrored image.
-        img = cv2.flip(img, 1)
+    async def _drain_track(self):
+        """Continuously pull frames from the source track and keep only the newest."""
+        while True:
+            try:
+                frame = await self.track.recv()
+                if self._queue.full():
+                    # Drop the stale queued frame – we replace it with the fresh one
+                    try:
+                        self._queue.get_nowait()
+                    except asyncio.QueueEmpty:
+                        pass
+                    self._frames_dropped += 1
+                    if self._frames_dropped % 30 == 0:
+                        logger.info(f"[FrameDrop] {self._frames_dropped} frames dropped so far – server is behind.")
+                await self._queue.put(frame)
+            except Exception as e:
+                logger.error(f"_drain_track error: {e}")
+                break
 
     def transform(self, img, cap_index):
         h, w = img.shape[:2]
@@ -111,18 +126,24 @@ class CapVideoTrack(VideoStreamTrack):
         return img
 
     async def recv(self):
-        # Get a frame from the browser webcam stream
-        frame = await self.track.recv()
+        # Block here until a fresh frame is available in our single-slot queue.
+        # The _drain_track background task keeps this queue populated with the
+        # LATEST frame, so we never build up a backlog.
+        frame = await self._queue.get()
 
         # Convert to numpy array (BGR from OpenCV)
         img = frame.to_ndarray(format="bgr24")
-        
+
         # Mirror the video for the classic "selfie" view immediately.
         img = cv2.flip(img, 1)
 
-        # Offload CPU intensive work to a thread so we don't block the event loop
+        # Offload CPU-intensive work to a thread so we don't block the event loop
+        t0 = time.perf_counter()
         loop = asyncio.get_event_loop()
         img = await loop.run_in_executor(None, self.transform, img, self.cap_index)
+        elapsed_ms = (time.perf_counter() - t0) * 1000
+        if elapsed_ms > 200:
+            logger.warning(f"[Slow] Frame processing took {elapsed_ms:.0f}ms")
 
         # 4. Re-pack frame to send back to browser
         new_frame = VideoFrame.from_ndarray(img, format="bgr24")
