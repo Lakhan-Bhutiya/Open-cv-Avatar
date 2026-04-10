@@ -7,15 +7,17 @@ interface UseServerRTCProps {
   capIndex?: number;
 }
 
+
+
 export function useServerRTC({
   localVideoRef,
   remoteVideoRef,
-  serverUrl = `${window.location.protocol}//${window.location.hostname}:5025/offer`,
+  serverUrl = import.meta.env.VITE_SERVERURL,
   capIndex = 0
 }: UseServerRTCProps) {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
 
