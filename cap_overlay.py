@@ -28,8 +28,6 @@ class CapOverlay:
         ----------
         cap_paths : list of str — file paths to cap PNG images (RGBA preferred)
         """
-        if not cap_paths:
-            raise ValueError("At least one cap path must be provided.")
         self.cap_paths = cap_paths
         self._cache: dict = {}
 
@@ -133,19 +131,27 @@ class CapOverlay:
     }
 
     def get_scaled_size(self, face_data: dict, cap_index: int = 0) -> tuple:
-        """Return (width, height) of the scaled cap without drawing anything."""
+        """Calculate the width and height the cap will be at the given scale."""
+        if not self.cap_paths:
+            return 0, 0
+            
         idx = cap_index % len(self.cap_paths)
         adj = self.CAP_ADJUSTMENTS.get(idx, {"scale": CAP_WIDTH_MULTIPLIER, "y_offset": 0.0})
         cap_rgba  = self._load(self.cap_paths[idx])
         scaled    = self._scale(cap_rgba, face_data["face_width"], adj["scale"])
         return scaled.shape[1], scaled.shape[0]
 
-    def apply(self, base_bgr: np.ndarray, face_data: dict,
-              cap_index: int = 0) -> tuple:
+    def apply(self, image: np.ndarray, face_data: dict, cap_index: int = 0) -> tuple:
         """
-        Place cap on the face in base_bgr.
+        Main entry point. Loads the cap for `cap_index`, scales it, 
+        perspectively warps it using the detected tilt, and alpha-blends it 
+        onto `image` using the detected facial box/eyebrows.
+        Returns (modified_image, applied_width, applied_height).
         """
-        idx = cap_index % len(self.cap_paths)
+        if not self.cap_paths:
+            return image, 0, 0
+            
+        idx       = cap_index % len(self.cap_paths)
         adj = self.CAP_ADJUSTMENTS.get(idx, {"scale": CAP_WIDTH_MULTIPLIER, "y_offset": 0.0})
         path      = self.cap_paths[idx]
         cap_rgba  = self._load(path)
@@ -222,7 +228,7 @@ class CapOverlay:
         dst_y2 = dst_y1 + (src_y2 - src_y1)
         dst_x2 = dst_x1 + (src_x2 - src_x1)
 
-        result = base_bgr.copy()
+        result = image.copy()
 
         if src_y2 <= src_y1 or src_x2 <= src_x1:
             return result, cap_w, cap_h   # nothing to draw
