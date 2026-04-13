@@ -17,7 +17,14 @@ from face_detector import FaceDetector
 from cap_overlay import CapOverlay
 from warning_system import check_placement, CapStatus
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[
+        logging.FileHandler("webrtc.log"),
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger("pc")
 
 relay = MediaRelay()
@@ -27,7 +34,8 @@ face_detector = FaceDetector(static_image_mode=False)
 
 # Get all cap images in the assets folder
 CAPS_DIR = os.path.join("web-app", "public", "assets", "caps")
-cap_paths = [os.path.join(CAPS_DIR, f) for f in os.listdir(CAPS_DIR) if f.endswith(".png")]
+cap_paths = [os.path.join(CAPS_DIR, f) for f in os.listdir(CAPS_DIR) 
+             if f.lower().endswith((".png", ".jpg", ".jpeg"))]
 cap_paths.sort() # Ensure consistent ordering
 if not cap_paths:
     # fallback
@@ -166,18 +174,27 @@ async def offer(request):
 
     @pc.on("datachannel")
     def on_datachannel(channel):
+        logger.info("Data channel '%s' established", channel.label)
         @channel.on("message")
         def on_message(message):
-            # We can use this message to change the cap_index
             if isinstance(message, str):
                 try:
                     data = json.loads(message)
                     if data.get("type") == "change_cap":
-                        # We'll need a way to pass this cap_index to the video track... 
-                        # We'll handle this purely in python memory by finding the track instance
-                        for sender in pc.getSenders():
-                            if isinstance(sender.track, CapVideoTrack):
-                                sender.track.cap_index = data.get("cap_index", 0)
+                        new_index = data.get("cap_index", 0)
+                        logger.info(f"Received change_cap request for index {new_index}")
+                        
+                        pc.pending_cap_index = new_index
+                        
+                        # Set directly if we stored it
+                        if hasattr(pc, "custom_video_track"):
+                            pc.custom_video_track.cap_index = new_index
+                            logger.info("Updated custom_video_track successfully.")
+                        else:
+                            # Fallback
+                            for sender in pc.getSenders():
+                                if hasattr(sender, "track") and isinstance(sender.track, CapVideoTrack):
+                                    sender.track.cap_index = new_index
                 except Exception as e:
                     logger.error(f"Error parsing datachannel message: {e}")
 
@@ -194,7 +211,14 @@ async def offer(request):
         if track.kind == "video":
             # Add our processing track
             local_video = CapVideoTrack(relay.subscribe(track))
+            
+            # Apply any buffered cap index if it was sent rapidly before track allocation
+            if hasattr(pc, "pending_cap_index"):
+                local_video.cap_index = pc.pending_cap_index
+                logger.info(f"Applied buffered cap_index {pc.pending_cap_index} on fresh video track")
+                
             pc.addTrack(local_video)
+            pc.custom_video_track = local_video
 
         @track.on("ended")
         async def on_ended():

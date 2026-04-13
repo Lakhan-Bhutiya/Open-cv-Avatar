@@ -20,12 +20,26 @@ export function useServerRTC({
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
+  const latestCapIndex = useRef(capIndex);
 
   // When cap index changes, send it over the data channel if connected
   useEffect(() => {
-    if (dcRef.current && dcRef.current.readyState === 'open') {
-      dcRef.current.send(JSON.stringify({ type: 'change_cap', cap_index: capIndex }));
-    }
+    latestCapIndex.current = capIndex;
+    
+    const sendCap = () => {
+      if (dcRef.current && dcRef.current.readyState === 'open') {
+        try {
+          dcRef.current.send(JSON.stringify({ type: 'change_cap', cap_index: capIndex }));
+        } catch (e) {
+          console.error('Failed to send change_cap:', e);
+        }
+      }
+    };
+    
+    sendCap();
+    // Mobile fallback timer to ensure DataChannel caught the event
+    const timer = setTimeout(sendCap, 400);
+    return () => clearTimeout(timer);
   }, [capIndex]);
 
   useEffect(() => {
@@ -58,7 +72,7 @@ export function useServerRTC({
         dcRef.current = dc;
         dc.onopen = () => {
           // Send initial cap index
-          dc.send(JSON.stringify({ type: 'change_cap', cap_index: capIndex }));
+          dc.send(JSON.stringify({ type: 'change_cap', cap_index: latestCapIndex.current }));
         };
 
         // 4. Handle incoming processed video from server

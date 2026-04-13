@@ -1,13 +1,17 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { useServerRTC } from './hooks/useServerRTC';
 
-// Match the App.tsx caps exactly
+// Caps are now dynamically renamed up to cap_8.png
 const CAPS = [
-  { id: 1, path: '/assets/caps/image.png' },
-  { id: 2, path: '/assets/caps/image_copy-removebg-preview.png' },
-  { id: 3, path: '/assets/caps/image_copy_2-removebg-preview (1).png' },
-  { id: 4, path: '/assets/caps/images-removebg-preview.png' },
-  { id: 5, path: '/assets/caps/istockphoto-1157599346-612x612-removebg-preview.png' },
+  { id: 1, path: '/assets/caps/cap_0.png' },
+  { id: 2, path: '/assets/caps/cap_1.png' },
+  { id: 3, path: '/assets/caps/cap_2.png' },
+  { id: 4, path: '/assets/caps/cap_3.png' },
+  { id: 5, path: '/assets/caps/cap_4.png' },
+  { id: 6, path: '/assets/caps/cap_5.png' },
+  { id: 7, path: '/assets/caps/cap_6.png' },
+  { id: 8, path: '/assets/caps/cap_7.png' },
+  { id: 9, path: '/assets/caps/cap_8.png' },
 ];
 
 export default function ServerApp() {
