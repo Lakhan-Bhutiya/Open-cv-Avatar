@@ -118,47 +118,34 @@ class CapOverlay:
     # Public API
     # ------------------------------------------------------------------
 
-    # Custom override multipliers for specific cap indices
-    CAP_MULTIPLIERS = {
-        0: 1.8,  # Black wide brim hat
-        6: 1.8,  # Black top hat
-        7: 1.3,  # Brown flat cap
-        8: 2.1,  # Cowboy hat
+    # Custom override adjustments for specific cap indices
+    # "scale": multiplier for face_width
+    # "y_offset": fraction of cap height to shift the cap DOWN
+    CAP_ADJUSTMENTS = {
+        0: {"scale": 2.6, "y_offset": 0.15},  # Black wide brim hat (huge brim, dips down)
+        6: {"scale": 1.5, "y_offset": 0.0},   # Top hat / flat cap
+        7: {"scale": 3.2, "y_offset": 0.25},  # Cowboy hat
+        8: {"scale": 3.2, "y_offset": 0.25},  # Fallback cowboy hat index
     }
 
     def get_scaled_size(self, face_data: dict, cap_index: int = 0) -> tuple:
         """Return (width, height) of the scaled cap without drawing anything."""
         idx = cap_index % len(self.cap_paths)
-        multiplier = self.CAP_MULTIPLIERS.get(idx, CAP_WIDTH_MULTIPLIER)
+        adj = self.CAP_ADJUSTMENTS.get(idx, {"scale": CAP_WIDTH_MULTIPLIER, "y_offset": 0.0})
         cap_rgba  = self._load(self.cap_paths[idx])
-        scaled    = self._scale(cap_rgba, face_data["face_width"], multiplier)
+        scaled    = self._scale(cap_rgba, face_data["face_width"], adj["scale"])
         return scaled.shape[1], scaled.shape[0]
 
     def apply(self, base_bgr: np.ndarray, face_data: dict,
               cap_index: int = 0) -> tuple:
         """
         Place cap on the face in base_bgr.
-
-        Alignment strategy:
-          - The cap brim bottom aligns just below the hairline (face_top_y + small offset)
-          - Rotation matches face tilt angle
-          - Perspective warp curves the brim to match head curvature
-
-        Parameters
-        ----------
-        base_bgr  : original image, BGR (H x W x 3)
-        face_data : dict from FaceDetector.detect()
-        cap_index : which cap to use (0 / 1 / 2)
-
-        Returns
-        -------
-        (result_bgr, cap_w, cap_h)
         """
         idx = cap_index % len(self.cap_paths)
-        multiplier = self.CAP_MULTIPLIERS.get(idx, CAP_WIDTH_MULTIPLIER)
+        adj = self.CAP_ADJUSTMENTS.get(idx, {"scale": CAP_WIDTH_MULTIPLIER, "y_offset": 0.0})
         path      = self.cap_paths[idx]
         cap_rgba  = self._load(path)
-        cap_s     = self._scale(cap_rgba, face_data["face_width"], multiplier)
+        cap_s     = self._scale(cap_rgba, face_data["face_width"], adj["scale"])
 
         # Apply perspective warp to curve the brim
         cap_s = self._perspective_warp(cap_s, BRIM_CURVE_RATIO)
@@ -210,7 +197,9 @@ class CapOverlay:
         face_center_x = face_data["face_center_x"]
 
         # Cap top is aligned so that the transformed anchor maps to `brim_y` and `face_center_x`
-        cap_top    = brim_y - anchor_y
+        # We apply y_offset to manually push hats with heavily curved brims down over the forehead.
+        y_shift = int(cap_h * adj["y_offset"])
+        cap_top    = brim_y - anchor_y + y_shift
         cap_left   = face_center_x - anchor_x
         
         # The true image endpoints (including transparent padding)
