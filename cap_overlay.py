@@ -122,10 +122,10 @@ class CapOverlay:
     # "scale": multiplier for face_width
     # "y_offset": fraction of cap height to shift the cap DOWN
     CAP_ADJUSTMENTS = {
-        0: {"scale": 2.6, "y_offset": 0.15},  # Black wide brim hat (huge brim, dips down)
-        6: {"scale": 1.5, "y_offset": 0.0},   # Top hat / flat cap
-        7: {"scale": 3.2, "y_offset": 0.25},  # Cowboy hat
-        8: {"scale": 3.2, "y_offset": 0.25},  # Fallback cowboy hat index
+        # cap_7 is the cowboy hat. 2.1x scale gives it a realistic brim size,
+        # and shifting it down 10% brings it comfortably to the eyebrows.
+        7: {"scale": 2.1, "y_offset": 0.10},  
+        8: {"scale": 2.1, "y_offset": 0.10},  
     }
 
     def get_scaled_size(self, face_data: dict, cap_index: int = 0) -> tuple:
