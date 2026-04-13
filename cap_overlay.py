@@ -60,10 +60,10 @@ class CapOverlay:
             self._cache[path] = img
         return self._cache[path]
 
-    def _scale(self, cap_rgba: np.ndarray, face_width: int) -> np.ndarray:
-        """Scale cap width to face_width * CAP_WIDTH_MULTIPLIER (keep aspect ratio)."""
+    def _scale(self, cap_rgba: np.ndarray, face_width: int, multiplier: float) -> np.ndarray:
+        """Scale cap width to face_width * multiplier (keep aspect ratio)."""
         orig_h, orig_w = cap_rgba.shape[:2]
-        target_w = max(1, int(face_width * CAP_WIDTH_MULTIPLIER))
+        target_w = max(1, int(face_width * multiplier))
         target_h = max(1, int(orig_h * target_w / orig_w))
         return cv2.resize(cap_rgba, (target_w, target_h),
                           interpolation=cv2.INTER_LANCZOS4)
@@ -118,10 +118,20 @@ class CapOverlay:
     # Public API
     # ------------------------------------------------------------------
 
+    # Custom override multipliers for specific cap indices
+    CAP_MULTIPLIERS = {
+        0: 1.8,  # Black wide brim hat
+        6: 1.8,  # Black top hat
+        7: 1.3,  # Brown flat cap
+        8: 2.1,  # Cowboy hat
+    }
+
     def get_scaled_size(self, face_data: dict, cap_index: int = 0) -> tuple:
         """Return (width, height) of the scaled cap without drawing anything."""
-        cap_rgba  = self._load(self.cap_paths[cap_index % len(self.cap_paths)])
-        scaled    = self._scale(cap_rgba, face_data["face_width"])
+        idx = cap_index % len(self.cap_paths)
+        multiplier = self.CAP_MULTIPLIERS.get(idx, CAP_WIDTH_MULTIPLIER)
+        cap_rgba  = self._load(self.cap_paths[idx])
+        scaled    = self._scale(cap_rgba, face_data["face_width"], multiplier)
         return scaled.shape[1], scaled.shape[0]
 
     def apply(self, base_bgr: np.ndarray, face_data: dict,
@@ -144,9 +154,11 @@ class CapOverlay:
         -------
         (result_bgr, cap_w, cap_h)
         """
-        path      = self.cap_paths[cap_index % len(self.cap_paths)]
+        idx = cap_index % len(self.cap_paths)
+        multiplier = self.CAP_MULTIPLIERS.get(idx, CAP_WIDTH_MULTIPLIER)
+        path      = self.cap_paths[idx]
         cap_rgba  = self._load(path)
-        cap_s     = self._scale(cap_rgba, face_data["face_width"])
+        cap_s     = self._scale(cap_rgba, face_data["face_width"], multiplier)
 
         # Apply perspective warp to curve the brim
         cap_s = self._perspective_warp(cap_s, BRIM_CURVE_RATIO)
