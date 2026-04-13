@@ -122,9 +122,12 @@ class CapOverlay:
     # "scale": multiplier for face_width
     # "y_offset": fraction of cap height to shift the cap DOWN
     CAP_ADJUSTMENTS = {
+        # Black Cap (index 0): User reported it looks too small and sits too high.
+        0: {"scale": 1.45, "y_offset": 0.18},
+        
         # Flat cap (index 6): bulbous image, needs tighter scale and pulled down slightly
         6: {"scale": 1.0, "y_offset": 0.15},
-        # Cowboy hat (index 7): dips at the sides, so it sits way too high. Needs big pull down.
+        # Cowboy hat (index 7/8): dips at the sides, so it sits way too high. Needs big pull down.
         7: {"scale": 2.2, "y_offset": 0.20},  
         8: {"scale": 2.2, "y_offset": 0.20},  
     }
