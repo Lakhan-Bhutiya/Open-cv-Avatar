@@ -11,8 +11,6 @@ const CAPS = [
   { id: 6, path: '/assets/caps/cap_5.png' },
   { id: 7, path: '/assets/caps/cap_6.png' },
   { id: 8, path: '/assets/caps/cap_7.png' },
-  { id: 9, path: '/assets/caps/cap_8.png' },
-  { id: 10, path: '/assets/caps/cap_9.png' },
 ];
 
 export default function ServerApp() {

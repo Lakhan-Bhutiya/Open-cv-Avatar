@@ -122,15 +122,17 @@ class CapOverlay:
     # "scale": multiplier for face_width
     # "y_offset": fraction of cap height to shift the cap DOWN (negative shifts UP)
     CAP_ADJUSTMENTS = {
-        # Flat cap (old cap_6): bulbous image, needs tighter scale and pulled down slightly
-        5: {"scale": 1.0, "y_offset": 0.15},
-        # Cowboy hat (old cap_8): dips at the sides, so it sits way too high. Needs big pull down.
-        6: {"scale": 2.2, "y_offset": 0.20},
+        # Cap 4: long hat, needs to be bigger
+        4: {"scale": 2.5, "y_offset": 0.05},
         
-        # New caps adjustments
-        7: {"scale": 1.2, "y_offset": -0.15},  # Brown tweed cap: shift slightly up
-        8: {"scale": 1.2, "y_offset": -0.15},  # Blue flat cap: shift slightly up
-        9: {"scale": 1.6, "y_offset": -0.15},  # Light blue fedora: make big and shift slightly up
+        # Cowboy hat (previously cap 6, now index 5): long hat, needs to be even bigger
+        5: {"scale": 3.0, "y_offset": 0.25},
+        
+        # Brown tweed cap (now index 6): shift slightly up
+        6: {"scale": 1.2, "y_offset": -0.15},
+        
+        # Blue flat cap (now index 7): shift slightly up
+        7: {"scale": 1.2, "y_offset": -0.15},
     }
 
     def get_scaled_size(self, face_data: dict, cap_index: int = 0) -> tuple:
