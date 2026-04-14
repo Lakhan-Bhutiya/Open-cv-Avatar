@@ -4,7 +4,6 @@ import json
 import logging
 import os
 import time
-import uuid
 import cv2
 import numpy as np
 
@@ -28,26 +27,19 @@ logging.basicConfig(
 )
 logger = logging.getLogger("pc")
 
-import threading
-
 relay = MediaRelay()
 
-# Initialize our AI models globally or via Thread-Local Storage so we don't reload them
-# We MUST use TLS for FaceDetector because calling it concurrently from multiple threads
-# causes deadlocks and freezes the server for all users!
-tls = threading.local()
+# Initialize our AI models globally so we don't reload them
+face_detector = FaceDetector(static_image_mode=False)
 
-def get_face_detector():
-    if not hasattr(tls, "detector"):
-        tls.detector = FaceDetector(static_image_mode=False)
-    return tls.detector
-
-# Get all cap images in the uploaded caps directory
-CAPS_DIR = os.path.join(os.path.dirname(__file__), "caps")
-os.makedirs(CAPS_DIR, exist_ok=True)
+# Get all cap images in the assets folder
+CAPS_DIR = os.path.join("web-app", "public", "assets", "caps")
 cap_paths = [os.path.join(CAPS_DIR, f) for f in os.listdir(CAPS_DIR) 
-             if f.lower().endswith((".png", ".webp"))]
-cap_paths.sort()
+             if f.lower().endswith((".png", ".jpg", ".jpeg"))]
+cap_paths.sort() # Ensure consistent ordering
+if not cap_paths:
+    # fallback
+    cap_paths = ["assets/caps/image.png"] # Example path, ideally it exists
 cap_overlay = CapOverlay(cap_paths)
 
 class CapVideoTrack(VideoStreamTrack):
@@ -88,8 +80,8 @@ class CapVideoTrack(VideoStreamTrack):
 
     def transform(self, img, cap_index):
         h, w = img.shape[:2]
-        # 1. Detect faces (Thread-Safe using local detector)
-        faces = get_face_detector().detect(img)
+        # 1. Detect faces
+        faces = face_detector.detect(img)
         
         # 2. Process faces and apply caps
         main_suggestion = "No face detected"
@@ -246,49 +238,6 @@ async def offer(request):
         ),
     )
 
-async def upload_cap(request):
-    try:
-        reader = await request.multipart()
-        field = await reader.next()
-        if not field or field.name != 'file':
-            return web.json_response({"error": "No file field provided inside the form data."}, status=400)
-        
-        filename = field.filename
-        ext = filename.split('.')[-1].lower() if '.' in filename else ''
-        if ext not in ["png", "webp"]:
-            return web.json_response({"error": "Must upload a PNG or WebP image with a transparent background."}, status=400)
-            
-        data = await field.read()
-        
-        cap_id = f"cap_{uuid.uuid4().hex[:8]}.{ext}"
-        cap_dir = os.path.join(os.path.dirname(__file__), "caps")
-        os.makedirs(cap_dir, exist_ok=True)
-        file_path = os.path.join(cap_dir, cap_id)
-        
-        with open(file_path, 'wb') as f:
-            f.write(data)
-            
-        # Validate alpha channel
-        img = cv2.imread(file_path, cv2.IMREAD_UNCHANGED)
-        if img is None or len(img.shape) < 3 or img.shape[2] != 4:
-            os.remove(file_path)
-            return web.json_response({"error": "Invalid image: Please remove the background and ensure the image is transparent."}, status=400)
-            
-        # Resize to max 400x400 for rapid WebRTC processing performance
-        h, w = img.shape[:2]
-        if max(h, w) > 400:
-            scale = 400 / max(h, w)
-            img = cv2.resize(img, (int(w*scale), int(h*scale)), interpolation=cv2.INTER_AREA)
-            cv2.imwrite(file_path, img)
-            
-        # Dynamically append to the system
-        cap_overlay.cap_paths.append(file_path)
-        new_index = len(cap_overlay.cap_paths) - 1
-        
-        return web.json_response({"success": True, "cap_index": new_index, "url": f"/caps/{cap_id}"})
-    except Exception as e:
-        logger.error(f"Error processing upload: {e}")
-        return web.json_response({"error": str(e)}, status=500)
 
 async def on_shutdown(app):
     # Close all peer connections
@@ -319,12 +268,5 @@ if __name__ == "__main__":
     resource = cors.add(app.router.add_resource("/offer"))
     cors.add(resource.add_route("POST", offer))
 
-    upload_res = cors.add(app.router.add_resource("/upload_cap"))
-    cors.add(upload_res.add_route("POST", upload_cap))
-    
-    # Expose the caps folder statically so the frontend can display thumbnails
-    cap_dir = os.path.join(os.path.dirname(__file__), "caps")
-    os.makedirs(cap_dir, exist_ok=True)
-    cors.add(app.router.add_static("/caps", cap_dir))
 
     web.run_app(app, host=args.host, port=args.port)

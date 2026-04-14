@@ -1,56 +1,31 @@
 import React, { useCallback, useRef, useState } from 'react';
 import { useServerRTC } from './hooks/useServerRTC';
 
-// No hardcoded CAPS array. Wait for user to upload.
+// Caps are now dynamically renamed up to cap_8.png
+const CAPS = [
+  { id: 1, path: '/assets/caps/cap_0.png' },
+  { id: 2, path: '/assets/caps/cap_1.png' },
+  { id: 3, path: '/assets/caps/cap_2.png' },
+  { id: 4, path: '/assets/caps/cap_3.png' },
+  { id: 5, path: '/assets/caps/cap_4.png' },
+  { id: 6, path: '/assets/caps/cap_5.png' },
+  { id: 7, path: '/assets/caps/cap_6.png' },
+  { id: 8, path: '/assets/caps/cap_7.png' },
+  { id: 9, path: '/assets/caps/cap_8.png' },
+];
 
 export default function ServerApp() {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
-  const [caps, setCaps] = useState<{id: number, path: string}[]>([]);
   const [selectedCapIndex, setSelectedCapIndex] = useState(0);
   const [captured, setCaptured] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { isConnected, error } = useServerRTC({
     localVideoRef,
     remoteVideoRef,
     capIndex: selectedCapIndex,
   });
-
-  const handleUploadClick = () => fileInputRef.current?.click();
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
-
-    try {
-      const baseServerUrl = (import.meta.env.VITE_SERVERURL as string || 'http://localhost:5025').replace('/offer', '');
-      const response = await fetch(`${baseServerUrl}/upload_cap`, {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await response.json();
-      if (!response.ok || data.error) {
-         alert(data.error || "Failed to upload cap.");
-      } else {
-         const newCap = { id: data.cap_index, path: `${baseServerUrl}${data.url}` };
-         setCaps(prev => [...prev, newCap]);
-         setSelectedCapIndex(data.cap_index);
-      }
-    } catch (err) {
-      alert("Error connecting to server to upload cap.");
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
 
   const handleCapture = useCallback(() => {
     const video = remoteVideoRef.current;
@@ -73,13 +48,12 @@ export default function ServerApp() {
     ctx.drawImage(video, 0, 0, W, H);
 
     const link = document.createElement('a');
-    const capIdStr = caps.length > 0 && caps[selectedCapIndex] ? caps[selectedCapIndex].id : 'none';
-    link.download = `cap_try_on_server_${capIdStr}.jpg`;
+    link.download = `cap_try_on_server_${CAPS[selectedCapIndex].id}.jpg`;
     link.href = out.toDataURL('image/jpeg', 0.92);
     link.click();
     setCaptured(true);
     setTimeout(() => setCaptured(false), 2000);
-  }, [selectedCapIndex, caps]);
+  }, [selectedCapIndex]);
 
   return (
     <div className="app-container">
@@ -115,33 +89,15 @@ export default function ServerApp() {
       </div>
 
       <div className="controls glass-panel">
-        <input 
-          type="file" 
-          accept="image/png, image/webp" 
-          ref={fileInputRef} 
-          style={{ display: 'none' }} 
-          onChange={handleFileChange} 
-        />
-        
-        <button className="upload-btn" onClick={handleUploadClick} disabled={isUploading}>
-          {isUploading ? 'Uploading...' : '📤 Upload Cap PNG'}
-        </button>
-
-        <div className="divider" />
-        
-        {caps.length === 0 ? (
-           <span style={{ fontSize: '0.9rem', opacity: 0.7 }}>Upload your first transparent hat!</span>
-        ) : (
-          caps.map((cap, i) => (
-            <button
-              key={cap.id}
-              className={`cap-btn ${selectedCapIndex === cap.id ? 'active' : ''}`}
-              onClick={() => setSelectedCapIndex(cap.id)}
-            >
-              <img src={cap.path} alt={`Cap ${cap.id}`} style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
-            </button>
-          ))
-        )}
+        {CAPS.map((cap, i) => (
+          <button
+            key={cap.id}
+            className={`cap-btn ${selectedCapIndex === i ? 'active' : ''}`}
+            onClick={() => setSelectedCapIndex(i)}
+          >
+            <img src={cap.path} alt={`Cap ${cap.id}`} />
+          </button>
+        ))}
 
         <div className="divider" />
 
@@ -161,21 +117,6 @@ export default function ServerApp() {
           width: 1px; height: 40px;
           background: rgba(255,255,255,0.15);
           margin: 0 4px;
-        }
-        .upload-btn {
-          padding: 0 16px;
-          height: 50px;
-          border-radius: 12px;
-          font-weight: 600;
-          cursor: pointer;
-          border: 1px solid rgba(255,255,255,0.2);
-          background: rgba(255,255,255,0.1);
-          color: white;
-          white-space: nowrap;
-          transition: all 0.2s;
-        }
-        .upload-btn:hover {
-          background: rgba(255,255,255,0.2);
         }
         .capture-btn {
           padding: 0 20px;
