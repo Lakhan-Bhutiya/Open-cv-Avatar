@@ -122,36 +122,25 @@ class CapOverlay:
     # "scale": multiplier for face_width
     # "y_offset": fraction of cap height to shift the cap DOWN (negative shifts UP)
     CAP_ADJUSTMENTS = {
-        # Cap 4: long hat, needs to be bigger
-        4: {"scale": 2.5, "y_offset": 0.05},
+        # Reverting back to native anchor with slight scale bumps for appearance
+        # Cap 4: long top hat
+        4: {"scale": 1.5, "y_offset": 0.0},
         
-        # Cowboy hat (previously cap 6, now index 5): long hat, needs to be even bigger
-        5: {"scale": 3.0, "y_offset": 0.25},
+        # Cowboy hat (index 5)
+        5: {"scale": 1.6, "y_offset": 0.0},
         
-        # Brown tweed cap (now index 6): shift slightly up
-        6: {"scale": 1.2, "y_offset": -0.15},
+        # Brown tweed cap (index 6)
+        6: {"scale": 1.2, "y_offset": 0.0},
         
-        # Blue flat cap (now index 7): shift slightly up
-        7: {"scale": 1.2, "y_offset": -0.15},
+        # Blue flat cap (index 7)
+        7: {"scale": 1.2, "y_offset": 0.0},
     }
 
-    def get_scaled_size(self, face_data: dict, cap_index: int = 0) -> tuple:
-        """Return (width, height) of the scaled cap without drawing anything."""
+    def get_placement_box(self, face_data: dict, cap_index: int = 0) -> tuple:
+        """Returns (cap_s, cap_w, cap_h, cap_top, cap_left) to perfectly simulate the draw."""
         idx = cap_index % len(self.cap_paths)
         adj = self.CAP_ADJUSTMENTS.get(idx, {"scale": CAP_WIDTH_MULTIPLIER, "y_offset": 0.0})
         cap_rgba  = self._load(self.cap_paths[idx])
-        scaled    = self._scale(cap_rgba, face_data["face_width"], adj["scale"])
-        return scaled.shape[1], scaled.shape[0]
-
-    def apply(self, base_bgr: np.ndarray, face_data: dict,
-              cap_index: int = 0) -> tuple:
-        """
-        Place cap on the face in base_bgr.
-        """
-        idx = cap_index % len(self.cap_paths)
-        adj = self.CAP_ADJUSTMENTS.get(idx, {"scale": CAP_WIDTH_MULTIPLIER, "y_offset": 0.0})
-        path      = self.cap_paths[idx]
-        cap_rgba  = self._load(path)
         cap_s     = self._scale(cap_rgba, face_data["face_width"], adj["scale"])
 
         # Apply perspective warp to curve the brim
@@ -164,8 +153,15 @@ class CapOverlay:
         coords = cv2.findNonZero(alpha_thresh)
         if coords is not None:
             x, y, border_w, border_h = cv2.boundingRect(coords)
-            unrotated_anchor_y = y + border_h
             unrotated_anchor_x = x + border_w // 2
+            
+            # Scan down EXACTLY the center column of the hat to find the front brim
+            center_col = alpha_thresh[:, unrotated_anchor_x]
+            filled_indices = np.nonzero(center_col)[0]
+            if len(filled_indices) > 0:
+                unrotated_anchor_y = int(filled_indices[-1])
+            else:
+                unrotated_anchor_y = y + border_h
         else:
             unrotated_anchor_y = cap_h
             unrotated_anchor_x = cap_w // 2
@@ -173,11 +169,9 @@ class CapOverlay:
         # 2. Apply rotation based on face tilt and transform the anchor point
         angle = face_data.get("angle", 0)
         if angle != 0:
-            # Rotate cap image
             cap_s = self._rotate_bound(cap_s, -angle)
             rotated_h, rotated_w = cap_s.shape[:2]
 
-            # Transform anchor point
             cX, cY = cap_w // 2, cap_h // 2
             M = cv2.getRotationMatrix2D((cX, cY), -angle, 1.0)
             cos = np.abs(M[0, 0])
@@ -197,19 +191,26 @@ class CapOverlay:
             anchor_x = unrotated_anchor_x
             anchor_y = unrotated_anchor_y
 
-        img_h, img_w  = base_bgr.shape[:2]
-
         # The brim bottom sits on the eyebrows as requested
         brim_y = face_data["eyebrow_y"]
         face_center_x = face_data["face_center_x"]
 
         # Cap top is aligned so that the transformed anchor maps to `brim_y` and `face_center_x`
-        # We apply y_offset to manually push hats with heavily curved brims down over the forehead.
         y_shift = int(cap_h * adj["y_offset"])
         cap_top    = brim_y - anchor_y + y_shift
         cap_left   = face_center_x - anchor_x
         
-        # The true image endpoints (including transparent padding)
+        return cap_s, cap_w, cap_h, cap_top, cap_left
+
+    def apply(self, base_bgr: np.ndarray, face_data: dict,
+              cap_index: int = 0) -> tuple:
+        """
+        Place cap on the face in base_bgr.
+        """
+        cap_s, cap_w, cap_h, cap_top, cap_left = self.get_placement_box(face_data, cap_index)
+        
+        img_h, img_w  = base_bgr.shape[:2]
+
         cap_bottom = cap_top + cap_h
         cap_right  = cap_left + cap_w
 
