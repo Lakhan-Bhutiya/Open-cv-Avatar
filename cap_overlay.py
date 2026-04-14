@@ -122,11 +122,11 @@ class CapOverlay:
     # "scale": multiplier for face_width
     # "y_offset": fraction of cap height to shift the cap DOWN (negative shifts UP)
     CAP_ADJUSTMENTS = {
-        # Cap 4: top hat - moved slightly up (y_offset 0.0)
-        4: {"scale": 1.4, "y_offset": 0.0},
+        # Cap 4: top hat - moved further UP (negative y_offset)
+        4: {"scale": 1.4, "y_offset": -0.05},
         
-        # Cowboy hat - previously index 5 - reduced scale for better fit
-        5: {"scale": 1.3, "y_offset": 0.25},
+        # Cowboy hat - previously index 5 - increased scale to fix "very small" issue
+        5: {"scale": 1.7, "y_offset": 0.25},
         
         # Brown tweed cap (now index 6): shift slightly up
         6: {"scale": 1.2, "y_offset": -0.15},
