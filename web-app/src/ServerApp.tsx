@@ -70,20 +70,7 @@ export default function ServerApp() {
       </div>
 
       <div className="video-container glass-panel" style={{ position: 'relative' }}>
-        {/* Hidden local video (just to grab webcam) */}
-        <video 
-          ref={localVideoRef} 
-          autoPlay 
-          playsInline 
-          muted 
-          style={{ 
-            display: isRemotePlaying ? 'none' : 'block',
-            width: '100%', height: '100%', objectFit: 'cover',
-            transform: 'scaleX(-1)'
-          }} 
-        />
-        
-        {/* The video rendered by the Python server */}
+        {/* The video rendered by the Python server (underneath) */}
         <video 
           ref={remoteVideoRef} 
           autoPlay 
@@ -91,10 +78,21 @@ export default function ServerApp() {
           muted 
           className="output_canvas"
           onPlaying={() => setIsRemotePlaying(true)}
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+
+        {/* Local raw webcam overlay on top until remote plays */}
+        <video 
+          ref={localVideoRef} 
+          autoPlay 
+          playsInline 
+          muted 
           style={{ 
-            display: isRemotePlaying ? 'block' : 'none',
-            width: '100%', height: '100%', objectFit: 'cover' 
-          }}
+            display: isRemotePlaying ? 'none' : 'block',
+            position: 'absolute', top: 0, left: 0,
+            width: '100%', height: '100%', objectFit: 'cover',
+            transform: 'scaleX(-1)'
+          }} 
         />
       </div>
 
