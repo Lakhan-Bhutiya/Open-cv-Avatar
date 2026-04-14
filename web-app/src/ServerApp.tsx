@@ -21,6 +21,7 @@ export default function ServerApp() {
 
   const [selectedCapIndex, setSelectedCapIndex] = useState(0);
   const [captured, setCaptured] = useState(false);
+  const [isRemotePlaying, setIsRemotePlaying] = useState(false);
 
   const { isConnected, error } = useServerRTC({
     localVideoRef,
@@ -75,7 +76,11 @@ export default function ServerApp() {
           autoPlay 
           playsInline 
           muted 
-          style={{ display: 'none' }} 
+          style={{ 
+            display: isRemotePlaying ? 'none' : 'block',
+            width: '100%', height: '100%', objectFit: 'cover',
+            transform: 'scaleX(-1)'
+          }} 
         />
         
         {/* The video rendered by the Python server */}
@@ -85,7 +90,11 @@ export default function ServerApp() {
           playsInline 
           muted 
           className="output_canvas"
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          onPlaying={() => setIsRemotePlaying(true)}
+          style={{ 
+            display: isRemotePlaying ? 'block' : 'none',
+            width: '100%', height: '100%', objectFit: 'cover' 
+          }}
         />
       </div>
 
