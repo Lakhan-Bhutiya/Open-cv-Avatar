@@ -21,7 +21,7 @@ export default function ServerApp() {
   const [captured, setCaptured] = useState(false);
   const [isRemotePlaying, setIsRemotePlaying] = useState(false);
 
-  const { isConnected, error } = useServerRTC({
+  const { isConnected, error, status, statusMessage } = useServerRTC({
     localVideoRef,
     remoteVideoRef,
     capIndex: selectedCapIndex,
@@ -38,13 +38,7 @@ export default function ServerApp() {
     out.height = H;
     const ctx = out.getContext('2d')!;
 
-    // Note: The Python server already mirrors the status banner,
-    // but the raw imagery might need mirroring if we want a selfie view,
-    // or maybe the Python server handles it? Actually, if Python processes it,
-    // we should just draw the frame exactly as it comes back.
-    // The browser webcam is implicitly mirrored in standard React overlay App via CSS.
-    // Let's just draw what Python gives us. If we need to flip it, we would flip it.
-    // Let's start with a direct copy since the server already composited the text correctly (un-mirrored text).
+    // Draw the remote video frame
     ctx.drawImage(video, 0, 0, W, H);
 
     const link = document.createElement('a');
@@ -67,7 +61,7 @@ export default function ServerApp() {
         {isConnected ? 'Server Connected' : error || 'Connecting...'}
       </div>
 
-      <div className="video-container glass-panel" style={{ position: 'relative' }}>
+      <div className="video-container glass-panel" style={{ position: 'relative', overflow: 'hidden' }}>
         {/* The video rendered by the Python server (underneath) */}
         <video 
           ref={remoteVideoRef} 
@@ -92,6 +86,16 @@ export default function ServerApp() {
             width: '100%', height: '100%', objectFit: 'cover'
           }} 
         />
+
+        {/* Premium Frontend Warning Banner */}
+        {isConnected && isRemotePlaying && (
+          <div className={`prompt-overlay ${status}`}>
+            <span className="prompt-icon">
+              {status === 'ok' ? '✓' : status === 'warning' ? '⚠' : '❗'}
+            </span>
+            <span className="prompt-text">{statusMessage}</span>
+          </div>
+        )}
       </div>
 
       <div className="controls glass-panel">
@@ -119,6 +123,60 @@ export default function ServerApp() {
       <style>{`
         /* Reuse CSS from App.tsx */
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap');
+        
+        .prompt-overlay {
+          position: absolute;
+          bottom: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          padding: 12px 24px;
+          border-radius: 20px;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          z-index: 100;
+          animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+          max-width: 90%;
+        }
+
+        .prompt-overlay.ok {
+          background: rgba(34, 197, 94, 0.2);
+          border-color: rgba(34, 197, 94, 0.3);
+        }
+        .prompt-overlay.warning {
+          background: rgba(251, 146, 60, 0.2);
+          border-color: rgba(251, 146, 60, 0.3);
+        }
+        .prompt-overlay.error {
+          background: rgba(239, 68, 68, 0.2);
+          border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        .prompt-icon {
+          font-size: 1.2rem;
+          font-weight: bold;
+        }
+        .ok .prompt-icon { color: #22c55e; }
+        .warning .prompt-icon { color: #fb923c; }
+        .error .prompt-icon { color: #ef4444; }
+
+        .prompt-text {
+          color: white;
+          font-weight: 600;
+          font-size: 0.95rem;
+          white-space: nowrap;
+          font-family: 'Outfit', sans-serif;
+        }
+
+        @keyframes slideUp {
+          from { transform: translate(-50%, 20px); opacity: 0; }
+          to { transform: translate(-50%, 0); opacity: 1; }
+        }
+
         .divider {
           width: 1px; height: 40px;
           background: rgba(255,255,255,0.15);

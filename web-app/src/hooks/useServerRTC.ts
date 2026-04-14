@@ -17,6 +17,8 @@ export function useServerRTC({
 }: UseServerRTCProps) {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<'ok' | 'warning' | 'error'>('error');
+  const [statusMessage, setStatusMessage] = useState('Connecting to server...');
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
@@ -73,6 +75,18 @@ export function useServerRTC({
         dc.onopen = () => {
           // Send initial cap index
           dc.send(JSON.stringify({ type: 'change_cap', cap_index: latestCapIndex.current }));
+        };
+
+        dc.onmessage = (evt) => {
+          try {
+            const data = JSON.parse(evt.data);
+            if (data.type === 'status') {
+              setStatus(data.status);
+              setStatusMessage(data.message);
+            }
+          } catch (e) {
+            console.error('Failed to parse dc message:', e);
+          }
         };
 
         // 4. Handle incoming processed video from server
@@ -160,5 +174,5 @@ export function useServerRTC({
     };
   }, [serverUrl, localVideoRef, remoteVideoRef]);
 
-  return { isConnected, error };
+  return { isConnected, error, status, statusMessage };
 }

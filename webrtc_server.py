@@ -53,6 +53,7 @@ class CapVideoTrack(VideoStreamTrack):
         super().__init__()  # don't forget this!
         self.track = track
         self.cap_index = 0
+        self.channel = None
         # Single-slot queue: putting a new frame when full drops the old one
         self._queue: asyncio.Queue = asyncio.Queue(maxsize=1)
         self._frames_dropped = 0
@@ -115,22 +116,17 @@ class CapVideoTrack(VideoStreamTrack):
                 if this_check.status != CapStatus.ERROR:
                     img, _, _ = cap_overlay.apply(img, face, cap_index=cap_index)
 
-        # 3. Draw the Status Banner
-        colors = {
-            CapStatus.OK: (94, 197, 34),
-            CapStatus.WARNING: (60, 146, 251),
-            CapStatus.ERROR: (68, 68, 239)
-        }
-        color = colors.get(main_cap_status, colors[CapStatus.ERROR])
+        # Send status to frontend via DataChannel
+        if hasattr(self, "channel") and self.channel and self.channel.readyState == "open":
+            try:
+                self.channel.send(json.dumps({
+                    "type": "status",
+                    "status": main_cap_status.value,
+                    "message": main_suggestion
+                }))
+            except Exception as e:
+                logger.error(f"Error sending status: {e}")
 
-        bar_h = 48
-        overlay = img.copy()
-        cv2.rectangle(overlay, (0, h - bar_h), (w, h), (0, 0, 0), -1)
-        img = cv2.addWeighted(overlay, 0.55, img, 0.45, 0)
-        cv2.line(img, (0, h - bar_h), (w, h - bar_h), color, 2)
-        icon = "[OK]" if main_cap_status == CapStatus.OK else "[WARN]" if main_cap_status == CapStatus.WARNING else "[ERR]"
-        msg = f"{icon} {main_suggestion}"
-        cv2.putText(img, msg, (15, h - 16), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
         return img
 
     async def recv(self):
@@ -175,6 +171,13 @@ async def offer(request):
     @pc.on("datachannel")
     def on_datachannel(channel):
         logger.info("Data channel '%s' established", channel.label)
+        
+        # Link channel to video track if it exists
+        if hasattr(pc, "custom_video_track"):
+            pc.custom_video_track.channel = channel
+        else:
+            pc.pending_channel = channel
+
         @channel.on("message")
         def on_message(message):
             if isinstance(message, str):
@@ -219,6 +222,11 @@ async def offer(request):
                 
             pc.addTrack(local_video)
             pc.custom_video_track = local_video
+            
+            # Link already established channel
+            if hasattr(pc, "pending_channel"):
+                local_video.channel = pc.pending_channel
+                logger.info("Linked pending data channel to video track")
 
         @track.on("ended")
         async def on_ended():
