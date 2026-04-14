@@ -87,6 +87,7 @@ export default function ServerApp() {
           autoPlay 
           playsInline 
           muted 
+          className="mirror-video"
           style={{ 
             display: isRemotePlaying ? 'none' : 'block',
             position: 'absolute', top: 0, left: 0,
@@ -155,6 +156,9 @@ export default function ServerApp() {
         }
         video {
             transform: none !important;
+        }
+        .mirror-video {
+            transform: scaleX(-1) !important;
         }
         .output_canvas {
             /* the Python server already handles the mirror flip. */
