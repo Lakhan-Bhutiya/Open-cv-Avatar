@@ -54,6 +54,7 @@ class CapVideoTrack(VideoStreamTrack):
         self.track = track
         self.cap_index = 0
         self.channel = None
+        self.debug_mode = False
         # Single-slot queue: putting a new frame when full drops the old one
         self._queue: asyncio.Queue = asyncio.Queue(maxsize=1)
         self._frames_dropped = 0
@@ -115,6 +116,11 @@ class CapVideoTrack(VideoStreamTrack):
                 # Only apply if it doesn't cause a fatal error (e.g. off screen top)
                 if this_check.status != CapStatus.ERROR:
                     img, _, _ = cap_overlay.apply(img, face, cap_index=cap_index)
+
+            # Draw debug lines if enabled
+            if self.debug_mode:
+                for face in faces:
+                    img = face_detector.draw_debug(img, face)
 
         # Send status to frontend via DataChannel
         if hasattr(self, "channel") and self.channel and self.channel.readyState == "open":
@@ -193,11 +199,11 @@ async def offer(request):
                         if hasattr(pc, "custom_video_track"):
                             pc.custom_video_track.cap_index = new_index
                             logger.info("Updated custom_video_track successfully.")
-                        else:
-                            # Fallback
-                            for sender in pc.getSenders():
-                                if hasattr(sender, "track") and isinstance(sender.track, CapVideoTrack):
-                                    sender.track.cap_index = new_index
+                    
+                    elif data.get("type") == "toggle_debug":
+                        if hasattr(pc, "custom_video_track"):
+                            pc.custom_video_track.debug_mode = not pc.custom_video_track.debug_mode
+                            logger.info(f"Debug mode toggled to {pc.custom_video_track.debug_mode}")
                 except Exception as e:
                     logger.error(f"Error parsing datachannel message: {e}")
 

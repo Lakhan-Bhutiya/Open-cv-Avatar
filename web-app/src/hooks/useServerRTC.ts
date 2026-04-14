@@ -19,6 +19,7 @@ export function useServerRTC({
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<'ok' | 'warning' | 'error'>('error');
   const [statusMessage, setStatusMessage] = useState('Connecting to server...');
+  const [isDebugActive, setIsDebugActive] = useState(false);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
@@ -43,6 +44,17 @@ export function useServerRTC({
     const timer = setTimeout(sendCap, 400);
     return () => clearTimeout(timer);
   }, [capIndex]);
+
+  const toggleDebug = () => {
+    if (dcRef.current && dcRef.current.readyState === 'open') {
+      try {
+        dcRef.current.send(JSON.stringify({ type: 'toggle_debug' }));
+        setIsDebugActive(prev => !prev);
+      } catch (e) {
+        console.error('Failed to send toggle_debug:', e);
+      }
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -174,5 +186,5 @@ export function useServerRTC({
     };
   }, [serverUrl, localVideoRef, remoteVideoRef]);
 
-  return { isConnected, error, status, statusMessage };
+  return { isConnected, error, status, statusMessage, isDebugActive, toggleDebug };
 }

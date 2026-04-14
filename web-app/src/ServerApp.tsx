@@ -21,7 +21,7 @@ export default function ServerApp() {
   const [captured, setCaptured] = useState(false);
   const [isRemotePlaying, setIsRemotePlaying] = useState(false);
 
-  const { isConnected, error, status, statusMessage } = useServerRTC({
+  const { isConnected, error, status, statusMessage, isDebugActive, toggleDebug } = useServerRTC({
     localVideoRef,
     remoteVideoRef,
     capIndex: selectedCapIndex,
@@ -99,31 +99,63 @@ export default function ServerApp() {
       </div>
 
       <div className="controls glass-panel">
-        {CAPS.map((cap, i) => (
-          <button
-            key={cap.id}
-            className={`cap-btn ${selectedCapIndex === i ? 'active' : ''}`}
-            onClick={() => setSelectedCapIndex(i)}
-          >
-            <img src={cap.path} alt={`Cap ${cap.id}`} />
-          </button>
-        ))}
+        <div className="caps-scroll" style={{ display: 'flex', gap: '12px', overflowX: 'auto', padding: '4px' }}>
+          {CAPS.map((cap, i) => (
+            <button
+              key={cap.id}
+              className={`cap-btn ${selectedCapIndex === i ? 'active' : ''}`}
+              onClick={() => setSelectedCapIndex(i)}
+            >
+              <img src={cap.path} alt={`Cap ${cap.id}`} />
+            </button>
+          ))}
+        </div>
 
         <div className="divider" />
 
-        <button
-          className={`capture-btn ${isConnected ? 'ready' : 'disabled'}`}
-          onClick={handleCapture}
-          disabled={!isConnected}
-        >
-          {captured ? '✓ Saved!' : '📸 Capture'}
-        </button>
+        <div className="action-buttons" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <button
+            className={`debug-btn ${isDebugActive ? 'active' : ''}`}
+            onClick={toggleDebug}
+            title="Toggle Debug Mode"
+          >
+            {isDebugActive ? '👁 Visible' : '👁 Debug'}
+          </button>
+
+          <button
+            className={`capture-btn ${isConnected ? 'ready' : 'disabled'}`}
+            onClick={handleCapture}
+            disabled={!isConnected}
+          >
+            {captured ? '✓ Saved!' : '📸 Capture'}
+          </button>
+        </div>
       </div>
 
       <style>{`
         /* Reuse CSS from App.tsx */
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&display=swap');
         
+        .debug-btn {
+          padding: 0 16px;
+          height: 50px;
+          border-radius: 14px;
+          font-size: 0.85rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.3s ease;
+          background: rgba(255, 255, 255, 0.05);
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          color: rgba(255, 255, 255, 0.7);
+          font-family: inherit;
+        }
+        .debug-btn.active {
+          background: rgba(34, 197, 94, 0.15);
+          border-color: #22c55e;
+          color: #22c55e;
+          box-shadow: 0 0 15px rgba(34, 197, 94, 0.2);
+        }
+
         .prompt-overlay {
           position: absolute;
           bottom: 20px;
@@ -184,8 +216,8 @@ export default function ServerApp() {
         }
         .capture-btn {
           padding: 0 20px;
-          height: 60px;
-          border-radius: 16px;
+          height: 50px;
+          border-radius: 14px;
           font-size: 0.9rem;
           font-weight: 700;
           cursor: pointer;

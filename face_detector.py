@@ -165,13 +165,25 @@ class FaceDetector:
         """Overlay debug lines: bounding box, eyebrow line, forehead zone."""
         x, y, w, h = face_data["bbox"]
         ey = face_data["eyebrow_y"]
+        cx = face_data["face_center_x"]
+        
+        # Bounding Box (Green)
         cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        cv2.line(image, (x, ey), (x + w, ey), (255, 80, 0), 2)
-        cv2.rectangle(image, (x, y), (x + w, ey), (0, 220, 220), 1)
-        cv2.putText(image, f"W:{face_data['face_width']}px", (x, y - 28),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 2)
-        cv2.putText(image, f"Forehead:{face_data['forehead_height']}px", (x, y - 8),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 220, 220), 2)
+        
+        # Eyebrow Line (Orange)
+        cv2.line(image, (x, ey), (x + w, ey), (0, 165, 255), 2)
+        
+        # Centering Crosshair (Cyan)
+        size = 20
+        cv2.line(image, (cx - size, ey), (cx + size, ey), (255, 255, 0), 2)
+        cv2.line(image, (cx, ey - size), (cx, ey + size), (255, 255, 0), 2)
+        
+        # Labels
+        cv2.putText(image, f"W:{face_data['face_width']}px", (cx + 25, ey - 25),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        cv2.putText(image, f"Angle:{face_data['angle']:.1f}", (cx + 25, ey - 5),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
+        
         return image
 
     def close(self):
