@@ -35,7 +35,7 @@ class PlacementCheck:
     coverage_pct: float  # % of cap area that is visible
 
 
-def check_placement(face_data: dict, cap_w: int, cap_h: int, cap_top_y: int, cap_left_x: int,
+def check_placement(face_data: dict, cap_w: int, cap_h: int,
                     min_coverage_pct: float = 50.0) -> PlacementCheck:
     """
     Determine if the scaled cap fits above the face in the image frame.
@@ -44,8 +44,6 @@ def check_placement(face_data: dict, cap_w: int, cap_h: int, cap_top_y: int, cap
     ----------
     face_data        : dict from FaceDetector.detect()
     cap_w, cap_h     : pixel size of the already-scaled cap
-    cap_top_y        : absolute top Y pixel mapping of the cap
-    cap_left_x       : absolute left X pixel mapping of the cap
     min_coverage_pct : minimum visible % before ERROR is raised (default 50)
     """
     img_h, img_w  = face_data["image_shape"]
@@ -70,6 +68,8 @@ def check_placement(face_data: dict, cap_w: int, cap_h: int, cap_top_y: int, cap
             coverage_pct=0.0,
         )
 
+    cap_top_y   = eyebrow_y - cap_h
+    cap_left_x  = face_center_x - cap_w // 2
     cap_right_x = cap_left_x + cap_w
 
     # Clipping on each side

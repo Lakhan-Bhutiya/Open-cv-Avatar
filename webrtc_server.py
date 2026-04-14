@@ -90,8 +90,8 @@ class CapVideoTrack(VideoStreamTrack):
         if faces:
             # We determine the status banner based on the "main" face (the first one)
             first_face = faces[0]
-            _, cap_w, cap_h, cap_top, cap_left = cap_overlay.get_placement_box(first_face, cap_index=cap_index)
-            check = check_placement(first_face, cap_w, cap_h, cap_top, cap_left)
+            cap_w, cap_h = cap_overlay.get_scaled_size(first_face, cap_index=cap_index)
+            check = check_placement(first_face, cap_w, cap_h)
             main_cap_status = check.status
             
             if first_face.get("is_profile", False):
@@ -108,8 +108,8 @@ class CapVideoTrack(VideoStreamTrack):
             # Loop through ALL faces and apply the cap to each
             for face in faces:
                 # Re-calculate size and placement check for THIS individual face
-                _, this_cap_w, this_cap_h, this_cap_top, this_cap_left = cap_overlay.get_placement_box(face, cap_index=cap_index)
-                this_check = check_placement(face, this_cap_w, this_cap_h, this_cap_top, this_cap_left)
+                this_cap_w, this_cap_h = cap_overlay.get_scaled_size(face, cap_index=cap_index)
+                this_check = check_placement(face, this_cap_w, this_cap_h)
                 
                 # Only apply if it doesn't cause a fatal error (e.g. off screen top)
                 if this_check.status != CapStatus.ERROR:
