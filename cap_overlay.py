@@ -126,7 +126,7 @@ class CapOverlay:
         4: {"scale": 1.5, "y_offset": -0.05},
         
         # Cowboy hat - index 5 - made much larger and moved up
-        5: {"scale": 2.4, "y_offset": 0.05},
+        5: {"scale": 2.4, "y_offset": 0.20},
         
         # Brown tweed cap (now index 6): shift slightly up
         6: {"scale": 1.3, "y_offset": -0.15},
