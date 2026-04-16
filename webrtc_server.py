@@ -107,20 +107,19 @@ class CapVideoTrack(VideoStreamTrack):
             else:
                 main_suggestion = "Perfect! Keep it there."
 
-            # Loop through ALL faces and apply the cap to each
-            for face in faces:
-                # Re-calculate size and placement check for THIS individual face
-                this_cap_w, this_cap_h = cap_overlay.get_scaled_size(face, cap_index=cap_index)
-                this_check = check_placement(face, this_cap_w, this_cap_h)
-                
-                # Only apply if it doesn't cause a fatal error (e.g. off screen top)
-                if this_check.status != CapStatus.ERROR:
-                    img, _, _ = cap_overlay.apply(img, face, cap_index=cap_index)
+            # Only process the FIRST face detected
+            face = faces[0]
+            # Re-calculate size and placement check for THIS face
+            this_cap_w, this_cap_h = cap_overlay.get_scaled_size(face, cap_index=cap_index)
+            this_check = check_placement(face, this_cap_w, this_cap_h)
+            
+            # Only apply if it doesn't cause a fatal error (e.g. off screen top)
+            if this_check.status != CapStatus.ERROR:
+                img, _, _ = cap_overlay.apply(img, face, cap_index=cap_index)
 
             # Draw debug lines if enabled
             if self.debug_mode:
-                for face in faces:
-                    img = face_detector.draw_debug(img, face)
+                img = face_detector.draw_debug(img, face)
 
         # Send status to frontend via DataChannel
         if hasattr(self, "channel") and self.channel and self.channel.readyState == "open":

@@ -28,7 +28,7 @@ CHIN_BOTTOM            = [152, 175, 148]
 
 
 class FaceDetector:
-    def __init__(self, static_image_mode=True, max_faces=10, confidence=0.5):
+    def __init__(self, static_image_mode=True, max_faces=1, confidence=0.5):
         # Initialize the modern FaceLandmarker Tasks API
         # Model downloaded to face_landmarker.task in the root
         model_path = os.path.join(os.path.dirname(__file__), "face_landmarker.task")
